@@ -26,8 +26,7 @@ class GenerateFlexEndpointCommand extends Command
             ->addArgument('flex_branch', InputArgument::REQUIRED, 'The branch of the target Flex endpoint')
             ->addArgument('output_directory', InputArgument::REQUIRED, 'The directory where generated files should be stored')
             ->addArgument('versions_json', InputArgument::OPTIONAL, 'The file where versions of Symfony are described')
-            ->addOption('contrib')
-        ;
+            ->addOption('contrib');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -59,11 +58,11 @@ class GenerateFlexEndpointCommand extends Command
             [$tree, $package] = explode("\t", trim($line));
             [,, $tree] = explode(' ', $tree);
 
-            if (!file_exists($package.'/manifest.json')) {
+            if (!file_exists($package . '/manifest.json')) {
                 continue;
             }
 
-            $manifest = json_decode(file_get_contents($package.'/manifest.json'), true);
+            $manifest = json_decode(file_get_contents($package . '/manifest.json'), true);
             $version = substr($package, 1 + strrpos($package, '/'));
             $package = substr($package, 0, -1 - \strlen($version));
 
@@ -94,22 +93,33 @@ class GenerateFlexEndpointCommand extends Command
         ksort($recipes, \SORT_NATURAL);
         ksort($recipeConflicts, \SORT_NATURAL);
 
-        file_put_contents($outputDir.'/index.json', json_encode([
+        file_put_contents($outputDir . '/index.json', json_encode([
             'aliases' => $aliases,
             'recipes' => $recipes,
             'recipe-conflicts' => $recipeConflicts,
             'versions' => $versions,
             'branch' => $sourceBranch,
             'is_contrib' => $contrib,
-            '_links' => [
-                'repository' => sprintf('github.com/%s', $repository),
-                'origin_template' => sprintf('{package}:{version}@github.com/%s:%s', $repository, $sourceBranch),
-                'recipe_template' => sprintf('https://raw.githubusercontent.com/%s/%s/{package_dotted}.{version}.json', $repository, $flexBranch),
-                'recipe_template_relative' => sprintf('{package_dotted}.{version}.json', $repository, $flexBranch),
-                'archived_recipes_template' => sprintf('https://raw.githubusercontent.com/%s/%s/archived/{package_dotted}/{ref}.json', $repository, $flexBranch),
-                'archived_recipes_template_relative' => sprintf('archived/{package_dotted}/{ref}.json', $repository, $flexBranch),
-            ],
-        ], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)."\n");
+            '_links' => match (true) {
+                // Quick and dirty way to mimic Github using gitlab url format
+                1 === preg_match('/^(?<scheme>https?):\/\/(?<host>[^\/]+)\/(?<path>[^\?]+)$/', $repository, $parts) => [
+                    'repository' => sprintf('%s://%s/%s', $parts['scheme'], $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/')))),
+                    'origin_template' => sprintf('{package}:{version}@%s/%s:%s', $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/'))), $sourceBranch),
+                    'recipe_template' => sprintf('%s://%s/%s/-/raw/%s/{package_dotted}.{version}.json', $parts['scheme'], $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/'))), $flexBranch),
+                    'recipe_template_relative' => sprintf('{package_dotted}.{version}.json', $repository, $flexBranch),
+                    'archived_recipes_template' => sprintf('%s://%s/%s/-/raw/%s/archived/{package_dotted}/{ref}.json', $parts['scheme'], $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/'))), $flexBranch),
+                    'archived_recipes_template_relative' => sprintf('archived/{package_dotted}/{ref}.json', $repository, $flexBranch),
+                ],
+                default => [
+                    'repository' => sprintf('github.com/%s', $repository),
+                    'origin_template' => sprintf('{package}:{version}@github.com/%s:%s', $repository, $sourceBranch),
+                    'recipe_template' => sprintf('https://raw.githubusercontent.com/%s/%s/{package_dotted}.{version}.json', $repository, $flexBranch),
+                    'recipe_template_relative' => sprintf('{package_dotted}.{version}.json', $repository, $flexBranch),
+                    'archived_recipes_template' => sprintf('https://raw.githubusercontent.com/%s/%s/archived/{package_dotted}/{ref}.json', $repository, $flexBranch),
+                    'archived_recipes_template_relative' => sprintf('archived/{package_dotted}/{ref}.json', $repository, $flexBranch),
+                ]
+            },
+        ], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES) . "\n");
 
         return 0;
     }
@@ -119,11 +129,11 @@ class GenerateFlexEndpointCommand extends Command
         unset($manifest['aliases']);
 
         $files = [];
-        $it = new \RecursiveDirectoryIterator($package.'/'.$version);
+        $it = new \RecursiveDirectoryIterator($package . '/' . $version);
         $it->setFlags($it::SKIP_DOTS | $it::FOLLOW_SYMLINKS | $it::UNIX_PATHS);
 
         foreach (new \RecursiveIteratorIterator($it) as $path => $file) {
-            $file = substr($path, 1 + \strlen($package.'/'.$version));
+            $file = substr($path, 1 + \strlen($package . '/' . $version));
             if (is_dir($path) || 'manifest.json' === $file) {
                 continue;
             }
@@ -159,7 +169,7 @@ class GenerateFlexEndpointCommand extends Command
                 ],
             ],
             \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES
-        )."\n";
+        ) . "\n";
         file_put_contents(sprintf('%s/%s.%s.json', $outputDir, str_replace('/', '.', $package), $version), $contents);
 
         // save another version for the archives
