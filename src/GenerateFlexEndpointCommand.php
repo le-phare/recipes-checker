@@ -102,7 +102,7 @@ class GenerateFlexEndpointCommand extends Command
             'is_contrib' => $contrib,
             '_links' => match (true) {
                 // Quick and dirty way to mimic Github using gitlab url format
-                1 === preg_match('/^(?<scheme>https?):\/\/(?<host>[^\/]+)\/(?<path>[^\?]+)$/', $repository, $parts) => [
+                1 === preg_match('/^(?<scheme>https?):\/\/(?:(?<credentials>.+)@)?(?<host>[^\/]+)\/(?<path>[^\?]+)$/', $repository, $parts) => [
                     'repository' => sprintf('%s://%s/%s', $parts['scheme'], $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/')))),
                     'origin_template' => sprintf('{package}:{version}@%s/%s:%s', $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/'))), $sourceBranch),
                     'recipe_template' => sprintf('%s://%s/%s/-/raw/%s/{package_dotted}.{version}.json', $parts['scheme'], $parts['host'], preg_replace('/(\.git)$/', '', (ltrim($parts['path'], '/'))), $flexBranch),
